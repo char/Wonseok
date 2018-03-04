@@ -12,7 +12,7 @@ public class Wonseok {
     private static final Wonseok INSTANCE = new Wonseok();
 
     private final Keymap keymap = KoreanKeymaps.DUBEOLSIK;
-    private boolean imeIsEnabled = true;
+    private boolean imeIsEnabled = false;
 
     private String handleInput(GuiTextField textField, String textToWrite) {
         if (StringUtils.isAlpha(textToWrite)) {
@@ -21,7 +21,6 @@ public class Wonseok {
 
             String currentText = textField.getText().substring(0, selectionStart);
             String afterSelectionText = textField.getText().substring(selectionEnd);
-
 
             char typedChar = textToWrite.charAt(0);
             int keyIndex = Keyboard.getKeyIndex(String.valueOf(Character.toUpperCase(typedChar)));
@@ -46,7 +45,6 @@ public class Wonseok {
             }
 
             return String.valueOf(hangulInput);
-
         }
 
         return textToWrite;
@@ -68,21 +66,17 @@ public class Wonseok {
         return HangulParser.construct(jamo.toString().toCharArray());
     }
 
-    public static void textboxKeyTypedHook(int keyCode, GuiTextField textField) {
-        if (textField.isFocused()) {
-            if (keyCode == Keyboard.KEY_RMETA) {
-                INSTANCE.imeIsEnabled = !INSTANCE.imeIsEnabled;
-            }
-        }
-    }
-
+    // Parameters are ordered this way so that we can ALOAD 0 straight before invoking the method
     public static String writeTextHook(String textToWrite, GuiTextField textField) {
-        // Parameters are ordered this way so that we can ALOAD 0 straight before invoking this method
+        if (GuiScreen.isShiftKeyDown() && textToWrite.equals(" ")) {
+            INSTANCE.imeIsEnabled = !INSTANCE.imeIsEnabled;
+            return "";
+        }
 
         if (INSTANCE.imeIsEnabled) {
             return INSTANCE.handleInput(textField, textToWrite);
+        } else {
+            return textToWrite;
         }
-
-        return textToWrite;
     }
 }

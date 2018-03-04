@@ -29,16 +29,6 @@ public class GuiTextFieldPatcher {
 
         for (MethodNode methodNode : classNode.methods) {
             if (methodNode.desc.equals("(CI)Z") && methodNode.name.equals(GUITEXTFIELD_TEXTBOXKEYTYPED_MCP)) {
-                {
-                    InsnList instructions = new InsnList();
-
-                    instructions.add(new VarInsnNode(Opcodes.ILOAD, 2));
-                    instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "site/hackery/wonseok/Wonseok", "textboxKeyTypedHook", String.format("(IL%s;)V", GUITEXTFIELD_MCP), false));
-
-                    methodNode.instructions.insert(instructions);
-                }
-
                 for (int i = methodNode.instructions.size() - 1; i >= 0; i--) {
                     // Loop backwards because we want to hook only the *last* instance of writeText.
 

@@ -27,4 +27,7 @@ public class KoreanKeymaps {
             register(Keyboard.KEY_Z + i, bottomRow.charAt(i));
         }
     }};
+
+    // TODO: Romaja -> Hangul (somehow)
+    // i.e annyeong -> 안녕
 }
