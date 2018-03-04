@@ -1,0 +1,41 @@
+group "site.hackery"
+version = "1.0.0"
+
+buildscript {
+    repositories {
+        jcenter()
+        maven {
+            name = "forge"
+            url = "https://files.minecraftforge.net/maven"
+        }
+        maven {
+            name = "sponge"
+            url = "http://repo.spongepowered.org/maven"
+        }
+    }
+    dependencies {
+        classpath "net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT"
+    }
+}
+
+apply plugin: "net.minecraftforge.gradle.tweaker-client"
+
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
+compileJava.options.encoding = "UTF-8"
+
+minecraft {
+    version = project.mcVersion
+    runDir = "run"
+
+    mappings = project.mcpVersion
+    tweakClass = "site.hackery.wonseok.launch.WonseokTweaker"
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile "org.ow2.asm:asm-debug-all:5.2"
+}
