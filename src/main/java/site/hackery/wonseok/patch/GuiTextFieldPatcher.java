@@ -10,6 +10,7 @@ public class GuiTextFieldPatcher {
     private static final String GUITEXTFIELD_WRITETEXT_NOTCH = "b"; // (Ljava/lang/String;)V
 
     private static final String GUITEXTFIELD_MCP = "net/minecraft/client/gui/GuiTextField";
+    private static final String GUITEXTFIELD_TEXTBOXKEYTYPED_MCP = "textboxKeyTyped";
     private static final String GUITEXTFIELD_WRITETEXT_MCP = "writeText";
 
     public byte[] patchClass(String name, byte[] classBuffer) {
@@ -27,17 +28,39 @@ public class GuiTextFieldPatcher {
         }
 
         for (MethodNode methodNode : classNode.methods) {
-            if (methodNode.desc.equals("(Ljava/lang/String;)V") && methodNode.name.equals(GUITEXTFIELD_WRITETEXT_MCP)) {
-                for (AbstractInsnNode insn : methodNode.instructions.toArray()) {
+            if (methodNode.desc.equals("(CI)Z") && methodNode.name.equals(GUITEXTFIELD_TEXTBOXKEYTYPED_MCP)) {
+                {
+                    InsnList instructions = new InsnList();
+
+                    instructions.add(new VarInsnNode(Opcodes.ILOAD, 2));
+                    instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "site/hackery/wonseok/Wonseok", "textboxKeyTypedHook", String.format("(IL%s;)V", GUITEXTFIELD_MCP), false));
+
+                    methodNode.instructions.insert(instructions);
+                }
+
+                for (int i = methodNode.instructions.size() - 1; i >= 0; i--) {
+                    // Loop backwards because we want to hook only the *last* instance of writeText.
+
+                    AbstractInsnNode insn = methodNode.instructions.get(i);
+
                     if (insn instanceof MethodInsnNode) {
+                        MethodInsnNode methodInsn = (MethodInsnNode) insn;
                         if (insn.getOpcode() == Opcodes.INVOKEVIRTUAL) {
-                            // TODO: hook writeText
+                            if (methodInsn.name.equals(GUITEXTFIELD_WRITETEXT_MCP) && methodInsn.desc.equals("(Ljava/lang/String;)V")) {
+                                InsnList instructions = new InsnList();
+
+                                instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                                instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "site/hackery/wonseok/Wonseok", "writeTextHook", String.format("(Ljava/lang/String;L%s;)Ljava/lang/String;", GUITEXTFIELD_MCP), false));
+
+                                methodNode.instructions.insertBefore(insn, instructions);
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
-
 
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         classNode.accept(writer);

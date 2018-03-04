@@ -4,6 +4,30 @@ import java.util.*;
 
 public class HangulParser {
     /**
+     * Atomically deconstructs a syllable into its constituent 자모.
+     * This method is <b>atomic</b>, meaning that vowels like 'ㅘ' are split into 'ㅗ, ㅏ' and
+     * consonant blocks like 'ㄼ' are split into 'ㄹ, ㅂ'.
+     *
+     * @param syllable A complete Hangul syllable.
+     * @return An array of constituent 자모. (technically 자소)
+     */
+    public static char[] deconstruct(char syllable) {
+        if (withinHangulSyllables(syllable)) {
+            char[] deconstructed = deconstructNonAtomic(syllable);
+
+            StringBuilder builder = new StringBuilder();
+
+            for (char c : deconstructed) {
+                builder.append(SPLIT_TABLE.getOrDefault(c, String.valueOf(c)));
+            }
+
+            return builder.toString().toCharArray();
+        } else {
+            return new char[0];
+        }
+    }
+
+    /**
      * Deconstructs a syllable into its constituent Unicode 자모.
      * This method is <b>non-atomic</b>, meaning that vowels like ㅘ will not be split into 'ㅗ, ㅏ',
      * and consonant blocks like ㄼ will not be split into 'ㄹ, ㅂ'.
@@ -11,7 +35,7 @@ public class HangulParser {
      * @param syllable A complete Hangul syllable
      * @return An array of constituent 자모.
      */
-    public static char[] deconstruct(char syllable) {
+    public static char[] deconstructNonAtomic(char syllable) {
         if (withinHangulSyllables(syllable)) {
             int base = syllable - 0xAC00;
 
@@ -32,61 +56,89 @@ public class HangulParser {
     }
 
     /**
-     * Atomically deconstructs a syllable into its constituent 자모.
-     * This method is <b>atomic</b>, meaning that vowels like 'ㅘ' are split into 'ㅗ, ㅏ' and
-     * consonant blocks like 'ㄼ' are split into 'ㄹ, ㅂ'.
-     *
-     * @param syllable A complete Hangul syllable.
-     * @return An array of constituent 자모. (technically 자소)
-     */
-    public static char[] deconstructAtomic(char syllable) {
-        if (withinHangulSyllables(syllable)) {
-            char[] deconstructed = deconstruct(syllable);
-
-            StringBuilder builder = new StringBuilder();
-
-            for (char c : deconstructed) {
-                builder.append(SPLIT_TABLE.getOrDefault(c, String.valueOf(c)));
-            }
-
-            return builder.toString().toCharArray();
-        } else {
-            return new char[0];
-        }
-    }
-
-    /**
-     * Non-atomically constructs a syllable from its constituent 자모.
-     *
-     * @param jamo An array of two or three Unicode 자모.
-     * @return A complete Hangul syllable.
-     */
-    public static char construct(char[] jamo) {
-        if (jamo.length != 2 && jamo.length != 3) {
-            return 0x00;
-        }
-
-        if (jamo.length == 3) {
-            int choseong = CHOSEONG.indexOf(jamo[0]);
-            int jungseong = JUNGSEONG.indexOf(jamo[1]);
-            int jongseong = JONGSEONG.indexOf(jamo[2]) + 1;
-
-            return (char) (0xAC00 + choseong * 21 * 28 + jungseong * 28 + jongseong);
-        } else {
-            int choseong = CHOSEONG.indexOf(jamo[0]);
-            int jungseong = JUNGSEONG.indexOf(jamo[1]);
-
-            return (char) (0xAC00 + choseong * 21 * 28 + jungseong * 28);
-        }
-    }
-
-    /**
      * Atomically constructs a syllable from its constituent 자모
      *
      * @param jamo An array of basic 자모.
      * @return A complete Hangul syllable.
      */
-    public static char constructAtomic(char[] jamo) {
+    public static String construct(char[] jamo) {
+        jamo = joinJamo(jamo);
+
+        StringBuilder builder = new StringBuilder();
+
+        int i = 0;
+        while (i <= jamo.length) {
+            int nextSize = calculateNextSyllableSize(jamo, i);
+
+            if (nextSize == 0) {
+                for (int j = i; j < jamo.length; j++) {
+                    builder.append(jamo[j]);
+                }
+
+                break;
+            }
+
+            char syllable = constructInternal(jamo, i, i + nextSize);
+
+            if (syllable != 0) {
+                builder.append(syllable);
+            } else {
+                for (int j = 0; j < nextSize; j++)
+                    builder.append(jamo[i + j]);
+            }
+
+            i += nextSize;
+        }
+
+        return builder.toString();
+    }
+
+    private static char constructInternal(char[] jamo, int startIndex, int endIndex) {
+        int length = endIndex - startIndex;
+
+        if (length != 2 && length != 3) {
+            return 0x00;
+        }
+
+        int choseong = CHOSEONG.indexOf(jamo[startIndex]);
+        int jungseong = JUNGSEONG.indexOf(jamo[startIndex + 1]);
+
+        if (choseong == -1 || jungseong == -1)
+            return 0x00;
+
+        if (length == 3) {
+            int jongseong = JONGSEONG.indexOf(jamo[startIndex + 2]) + 1;
+
+            if (jongseong == -1)
+                return 0x00;
+
+            return (char) (0xAC00 + choseong * 21 * 28 + jungseong * 28 + jongseong);
+        } else {
+            return (char) (0xAC00 + choseong * 21 * 28 + jungseong * 28);
+        }
+    }
+
+    private static int calculateNextSyllableSize(char[] jamo, int offset) {
+        final int remainingJamo = jamo.length - offset;
+
+        if (remainingJamo > 2) {
+            if (JONGSEONG.contains(jamo[offset + 2])) {
+                if (remainingJamo > 3 && JUNGSEONG.contains(jamo[offset + 3]))
+                    return 2;
+
+                return 3;
+            } else {
+                return 2;
+            }
+        }
+
+        if (remainingJamo == 2)
+            return remainingJamo;
+
+        return 0;
+    }
+
+    private static char[] joinJamo(char[] jamo) {
         StringBuilder builder = new StringBuilder();
 
         for (int i = 0; i < jamo.length; i++) {
@@ -99,7 +151,20 @@ public class HangulParser {
 
                 String agglomerate = String.valueOf(c) + String.valueOf(next);
 
+                boolean shouldJoin = false;
+
                 if (JOIN_TABLE.containsKey(agglomerate)) {
+                    shouldJoin = true;
+
+                    if (i < jamo.length - 2) {
+                        char after = jamo[i + 2];
+                        if (JUNGSEONG.contains(after)) {
+                            shouldJoin = false;
+                        }
+                    }
+                }
+
+                if (shouldJoin) {
                     builder.append(JOIN_TABLE.get(agglomerate));
                     i++;
                 } else {
@@ -108,7 +173,7 @@ public class HangulParser {
             }
         }
 
-        return construct(builder.toString().toCharArray());
+        return builder.toString().toCharArray();
     }
 
     /**
@@ -135,7 +200,7 @@ public class HangulParser {
         // The first character in the Hangul Jamo block is 'ㄱ' at 0x1100
         // The last character in the Hangul Jamo block is the 옛한글 character 'ᇿ' at 0x11FF
 
-        return 0x1100 <= codepoint && codepoint <= 0x11FF;
+        return 0x3130 <= codepoint && codepoint <= 0x318F;
     }
 
     private static final List<Character> CHOSEONG = Arrays.asList(
